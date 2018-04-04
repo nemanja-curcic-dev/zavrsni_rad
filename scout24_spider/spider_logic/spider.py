@@ -17,8 +17,7 @@ import copy
 from .conf import dictionary, apartment_categories, house_categories, office_commerce_categories, parking_categories
 import random
 
-#$REL_PATH = '/../immo-data/properties/'
-REL_PATH = '/../../../spiders/spiders/immo-data/properties/'
+REL_PATH = '/../../properties/'
 
 
 class Spider:
@@ -38,7 +37,7 @@ class Spider:
         self.not_found = []
         self.rows_inserted = 0
 
-        self.NUMBER_OF_ADS = 3000
+        self.NUMBER_OF_ADS = 20
         self.orig_slug = []
         self.immocosmos = 'https://www.immocosmos.ch/'
 

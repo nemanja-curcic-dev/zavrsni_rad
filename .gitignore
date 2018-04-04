@@ -92,14 +92,4 @@ ENV/
 
 /data/
 .idea
-/spiders/immo-data
-
-/homestreet_spider/spider_logic/links.txt
-/homestreet_spider/spider_logic/pages.txt
-/homestreet_spider/immo-data
-/scout24_spider/immo-data
-/immomig_spider/immo-data
-/immomig_spider/not_found.txt
-/buy-rent/immo-data
-/as_immobilien_spider/immo-data
-/rethinkdb_data
+/properties
