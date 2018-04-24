@@ -1,8 +1,5 @@
-#!/usr/bin/env python
-# -*- encoding: utf8 -*-
-import sys, os
-
-sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../")
+import sys
+import os
 import requests
 import subprocess
 from bs4 import BeautifulSoup
