@@ -9,16 +9,16 @@ import asyncio
 import os
 
 parser = argparse.ArgumentParser(description='Run spider for Scout24.ch')
-parser.add_argument('-n', '--database_name', default='immoreal',
+parser.add_argument('-n', '--database_name', default='zavrsni_rad',
                     metavar='', help='Name of database host')
-parser.add_argument('-i', '--database_ip', default='139.59.158.52', metavar='',
+parser.add_argument('-i', '--database_ip', default='127.0.0.1', metavar='',
                     help='IPv4 address of database host')
 parser.add_argument('-d', '--database_port', default=28015, metavar='',
                     type=int, help='Port number for connection to database')
 parser.add_argument('-c', '--concurrent', metavar='',
-                    default=5, type=int, help='Argument for number of concurrent requests sent, default is 5')
+                    default=10, type=int, help='Argument for number of concurrent requests sent, default is 5')
 parser.add_argument('-p', '--pause', metavar='',
-                    type=float, default=1, help='Pause duration between requests, default is 1 second')
+                    type=float, default=0.4, help='Pause duration between requests, default is 1 second')
 args = parser.parse_args()
 args = parser.parse_args()
 
@@ -89,9 +89,7 @@ if __name__ == '__main__':
                                               username='nemanja.immo.reports',
                                               password='R7bZwxHQ1Jht',
                                               from_addr='nemanja.immo.reports@gmail.com',
-                                              to_addr=['nikola.derikonjic.80@gmail.com',
-                                                       'nemanja.immo.reports@gmail.com',
-                                                       'support@immocosmos.ch'],
+                                              to_addr=['nemanja.immo.reports@gmail.com'],
                                               subject=subject,
                                               msg=' ',
                                               path='scout24_spider_report.xlsx')

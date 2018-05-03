@@ -2,23 +2,22 @@
 # -*- encoding: utf8 -*-
 import sys, os
 
-sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../")
 import requests
 import subprocess
 from bs4 import BeautifulSoup
 import re
 import json
 import uuid
-from .conf import headers as bh
+from conf import headers as bh
 import time
 from datetime import datetime
 import rethinkdb as rdb
 import copy
-from .conf import dictionary, apartment_categories, house_categories, office_commerce_categories, parking_categories
+from conf import dictionary, apartment_categories, house_categories, office_commerce_categories, parking_categories
 import random
 
-#REL_PATH = '/../immo-data/properties/'
-REL_PATH = '/../../../spiders/spiders/immo-data/properties/'
+REL_PATH = '/../../properties/'
+#REL_PATH = '/../../../spiders/spiders/immo-data/properties/'
 
 
 class Spider:
@@ -162,10 +161,10 @@ class Spider:
 
                 if dont_skip_images:
                     print('skip images')
-                    if soup.find("div", {"class": "swiper-wrapper sc-cqCuEk dMogzA"}) is not None\
+                    if soup.find("div", {"class": "swiper-wrapper sc-dliRfk fbLxZz"}) is not None\
                             or soup.find("div", {"class": "swiper-container  swiper-uid-media-gallery sc-VJcYb hKZfbA"}) is not None\
                             or soup.find("div", {"class": "swiper-wrapper sc-iBEsjs fffXLE"}) is not None:
-                        images = soup.findAll("img", {"class": "swiper-lazy sc-krDsej iGQujn"})
+                        images = soup.findAll("img", {"class": "swiper-lazy sc-dTdPqK jZzoP"})
 
                         print(images)
 
@@ -298,7 +297,7 @@ class Spider:
     @staticmethod
     def update_geo(row, soup):
         print('Updating geo location...')
-        f = soup.findAll("a", {"class": "sc-gtfDJT jlXMqB"})
+        f = soup.findAll("a", {"class": "sc-fOICqy eiIwtf"})
 
         lat = 0
         lon = 0
@@ -307,7 +306,6 @@ class Spider:
 
             if e.text == "Open in Google Maps" or e.text == "In Google Maps öffnen":
 
-                import re
                 regex = r"(?<=\=)([\-]?[\d]*\.[\d]*),([\-]?[\d]*\.[\d]*)"
 
                 matches = re.finditer(regex, e["href"])
@@ -431,27 +429,27 @@ class Spider:
             for td in tds:
                 if td.text == "Public transport":
                     bus = re.findall(r'\d+', td.findNext('td').text)
-                    row["distances"]["busStation"] = bus[0]
+                    row["distances"]["busStation"] = int(bus[0])
 
                 if td.text == "Kindergarten":
                     bus = re.findall(r'\d+', td.findNext('td').text)
-                    row["distances"]["kindergarden"] = bus[0]
+                    row["distances"]["kindergarden"] = int(bus[0])
 
                 if td.text == "Primary school":
                     bus = re.findall(r'\d+', td.findNext('td').text)
-                    row["distances"]["primarySchool"] = bus[0]
+                    row["distances"]["primarySchool"] = int(bus[0])
 
                 if td.text == "Secondary school":
                     bus = re.findall(r'\d+', td.findNext('td').text)
-                    row["distances"]["secondarySchool"] = bus[0]
+                    row["distances"]["secondarySchool"] = int(bus[0])
 
                 if td.text == "Shops":
                     bus = re.findall(r'\d+', td.findNext('td').text)
-                    row["distances"]["shopping"] = bus[0]
+                    row["distances"]["shopping"] = int(bus[0])
 
                 if td.text == "Distance to next motorway access":
                     bus = re.findall(r'\d+', td.findNext('td').text)
-                    row["distances"]["highway"] = bus[0]
+                    row["distances"]["highway"] = int(bus[0])
 
         return row["distances"]
 
@@ -459,40 +457,15 @@ class Spider:
     def details(soup, row):
         print('Setting description...')
         try:
-            articles = soup.findAll("article", {"class": "sc-iFMziU eSVewB"})
+            articles = soup.findAll("article", {"class": "sc-kQsIoO dgcxoN"})
 
             for article in articles:
                 if article.find('h2') is not None:
                     if article.find('h2').text.find('Description') != -1:
-                        row['details']['description'] = str(article.find('div', {'class': 'sc-cqpYsc hkaHLj'}))
+                        row['details']['description'] = str(article.find('div', {'class': 'sc-cHSUfg IGUaS'}))
 
         except Exception as e:
             print("error setting description " + repr(e))
-
-        try:
-            tables = soup.findAll("table", {"class": "data-table"})
-
-            for table in tables:
-
-                tds = table.findAll("td")
-
-                for td in tds:
-                    if td.text == "Availability":
-
-                        avat = td.findNext('td').text
-
-                        if avat == "immediately" or avat == "Immediately" or avat == "On request":
-                            row["details"]["availableAt"] = int(time.time())
-
-                        else:
-                            try:
-                                row["details"]["availableAt"] = int(time.mktime(datetime.strptime(avat.strip(), "%d.%m.%Y").timetuple()))
-                            except Exception as e:
-                                row["details"]["availableAt"] = avat
-                                print("Wrong format " + repr(e) + "\t"+avat)
-
-        except Exception as e:
-            print(repr(e))
 
         return row["details"]
 
@@ -500,8 +473,8 @@ class Spider:
         sys.stdout.write(m)
 
 if __name__ == '__main__':
-    spider = Spider('immoreal',
-                    '139.59.158.52',
+    spider = Spider('zavrsni_rad',
+                    '127.0.0.1',
                     28015,
-                    ['https://www.immoscout24.ch/en/d/detached-house-rent-biberstein/4803420'])
+                    ['https://www.immoscout24.ch/en/d/detached-house-rent-erlinsbach/2845302?s=3&t=1&l=28&ct=11&ci=4&pn=1'])
     spider.grab_data()

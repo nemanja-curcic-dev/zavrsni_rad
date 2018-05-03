@@ -91,10 +91,10 @@ class Scout24GetLinks:
                 time.sleep(self.sleep_time)
 
     def _parse_links_from_ad_pages(self, bs, url):
-        div = bs.find('div', {'class': 'sc-fjhmcy fXHclU'})
+        div = bs.find('div', {'class': 'sc-erNlkL frNfAJ'})
 
         if div is not None:
-            h1 = div.find('h1', {'class': 'sc-eXNvrr iUONPR'})
+            h1 = div.find('h1', {'class': 'sc-cpmKsF hHCBUV'})
             amount = re.search(r'\d+', h1.text).group(0)
             if int(amount) == 1000:
                 print(url, amount)
@@ -132,13 +132,13 @@ class Scout24GetLinks:
 
     def _parse_relative_urls(self, search_results):
         for bs in search_results:
-            h3_tags = bs.findAll('h3', {'class': 'sc-feryYK eaNMxB'})
+            h3_tags = bs.findAll('h3', {'class': 'sc-kkbgRg iGfZRt'})
             print('h3 tags: ', h3_tags)
 
             try:
                 for h3 in h3_tags:
                     if h3 is not None:
-                        a = h3.find('a', {'class': 'sc-gtfDJT cOnQKO'})
+                        a = h3.find('a', {'class': 'sc-fOICqy iDHGrp'})
                         href = a['href']
                         print(href)
                         slug = re.search(r'/(\d{6,8})\?', href)
