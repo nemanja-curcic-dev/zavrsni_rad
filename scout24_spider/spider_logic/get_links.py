@@ -91,7 +91,7 @@ class Scout24GetLinks:
                 time.sleep(self.sleep_time)
 
     def _parse_links_from_ad_pages(self, bs, url):
-        div = bs.find('div', {'class': 'sc-yZwTr eVeZID'})
+        div = bs.find('div', {'class': 'sc-fjhmcy fXHclU'})
 
         if div is not None:
             h1 = div.find('h1', {'class': 'sc-eXNvrr iUONPR'})
@@ -178,13 +178,29 @@ class Scout24GetLinks:
             if link not in self.db_urls:
                 self.links_to_be_scraped.append(link)
 
+        self._filter_out_duplicates()
+
+    def _filter_out_duplicates(self):
+        duplicates = list(rethinkdb.table('duplicates').get_all(self.spider_name, index='spiderName').run(self.conn))
+        db_duplicates = {}
+
+        for row in duplicates:
+            url = row['url'].strip()
+            if url not in db_duplicates:
+                db_duplicates[url] = row
+
+        print('Count in links to be scraped before filtering: {}'.format(len(self.links_to_be_scraped)))
+
+        self.links_to_be_scraped = list(filter(lambda x: x not in db_duplicates, self.links_to_be_scraped))
+
+
 if __name__ == '__main__':
     start = time.time()
     
     loop = asyncio.get_event_loop()
     spider = Scout24GetLinks(loop=loop,
-                             db='zavrsni_rad',
-                             db_ip='localhost',
+                             db='immoreal',
+                             db_ip='139.59.158.52',
                              db_port=28015,
                              concurrent=10,
                              pause=0.3)

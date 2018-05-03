@@ -1,5 +1,8 @@
-import sys
-import os
+#!/usr/bin/env python
+# -*- encoding: utf8 -*-
+import sys, os
+
+sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../")
 import requests
 import subprocess
 from bs4 import BeautifulSoup
@@ -14,7 +17,8 @@ import copy
 from .conf import dictionary, apartment_categories, house_categories, office_commerce_categories, parking_categories
 import random
 
-REL_PATH = '/../../properties/'
+#REL_PATH = '/../immo-data/properties/'
+REL_PATH = '/../../../spiders/spiders/immo-data/properties/'
 
 
 class Spider:
@@ -34,7 +38,7 @@ class Spider:
         self.not_found = []
         self.rows_inserted = 0
 
-        self.NUMBER_OF_ADS = 20
+        self.NUMBER_OF_ADS = 3000
         self.orig_slug = []
         self.immocosmos = 'https://www.immocosmos.ch/'
 
@@ -135,7 +139,11 @@ class Spider:
             row["distances"] = self.distances(soup, row)
             self.set_technics(soup, row)
 
-            row["name"] = soup.findAll("h1")[0].text
+            try:
+                row["name"] = soup.findAll("h1")[0].text
+            except IndexError:
+                continue
+
             row["isActive"] = True
 
             row["timeStampAdded"] = int(time.time())
@@ -144,6 +152,7 @@ class Spider:
             self.rows_inserted += 1
 
             row["id"] = result["generated_keys"][0]
+            print(row["id"])
 
             self.w("Created: "+row["id"])
             self.w("Created slug: " + row["slug"] + "\n")
@@ -494,5 +503,5 @@ if __name__ == '__main__':
     spider = Spider('immoreal',
                     '139.59.158.52',
                     28015,
-                    ['https://www.immoscout24.ch/4386633'])
+                    ['https://www.immoscout24.ch/en/d/detached-house-rent-biberstein/4803420'])
     spider.grab_data()
