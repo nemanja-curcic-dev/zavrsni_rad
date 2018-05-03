@@ -8,12 +8,12 @@ from bs4 import BeautifulSoup
 import re
 import json
 import uuid
-from conf import headers as bh
+from .conf import headers as bh
 import time
 from datetime import datetime
 import rethinkdb as rdb
 import copy
-from conf import dictionary, apartment_categories, house_categories, office_commerce_categories, parking_categories
+from .conf import dictionary, apartment_categories, house_categories, office_commerce_categories, parking_categories
 import random
 
 REL_PATH = '/../../properties/'
