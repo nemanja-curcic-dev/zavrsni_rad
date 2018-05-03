@@ -37,7 +37,7 @@ class Spider:
         self.not_found = []
         self.rows_inserted = 0
 
-        self.NUMBER_OF_ADS = 3000
+        self.NUMBER_OF_ADS = 150
         self.orig_slug = []
         self.immocosmos = 'https://www.immocosmos.ch/'
 

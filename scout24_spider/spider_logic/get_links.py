@@ -178,21 +178,6 @@ class Scout24GetLinks:
             if link not in self.db_urls:
                 self.links_to_be_scraped.append(link)
 
-        self._filter_out_duplicates()
-
-    def _filter_out_duplicates(self):
-        duplicates = list(rethinkdb.table('duplicates').get_all(self.spider_name, index='spiderName').run(self.conn))
-        db_duplicates = {}
-
-        for row in duplicates:
-            url = row['url'].strip()
-            if url not in db_duplicates:
-                db_duplicates[url] = row
-
-        print('Count in links to be scraped before filtering: {}'.format(len(self.links_to_be_scraped)))
-
-        self.links_to_be_scraped = list(filter(lambda x: x not in db_duplicates, self.links_to_be_scraped))
-
 
 if __name__ == '__main__':
     start = time.time()

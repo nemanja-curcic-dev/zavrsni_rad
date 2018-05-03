@@ -98,12 +98,6 @@ if __name__ == '__main__':
                 f = open(os.path.dirname(os.path.realpath(__file__)) + REL_PATH, 'w')
                 f.write('true')
                 f.close()
-
-                # write categories not found in txt file
-                not_found = open(os.path.dirname(os.path.realpath(__file__)) + '/not_found.txt', 'w')
-                for nf in scout24_spider.not_found:
-                    not_found.write(nf + '\n')
-                not_found.close()
             else:
                 print('There is instance of script already running')
     except Exception as e:
