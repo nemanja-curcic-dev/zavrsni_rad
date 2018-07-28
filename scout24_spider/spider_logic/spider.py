@@ -29,7 +29,7 @@ class Spider:
         self.links_for_scraping = links_for_scraping
 
         self.conn = rethinkdb.connect(db=db, host=db_host, port=db_port, user="admin",
-                                password="4f752a0aac5a1a2ed0a6627854d174facb99dc36cd756776b609e9cb8dcce275")
+                                password=os.environ["PASSWORD"])
 
         self.NUMBER_OF_ADS = 150
         self.immocosmos = 'https://www.immocosmos.ch/'

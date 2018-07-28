@@ -154,7 +154,7 @@ class Scout24GetLinks:
                                       host=self.db_ip,
                                       port=self.db_port,
                                       user="admin",
-                                      password="4f752a0aac5a1a2ed0a6627854d174facb99dc36cd756776b609e9cb8dcce275")
+                                      password=os.environ["PASSWORD"])
 
         print("Fetching urls from database...", file=sys.stderr)
         rows = list(rethinkdb.table("property")
