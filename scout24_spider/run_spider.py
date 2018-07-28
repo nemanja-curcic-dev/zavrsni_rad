@@ -50,3 +50,6 @@ if __name__ == '__main__':
     scout24_spider.grab_data()
 
     running_time_spider = helpers.convert_seconds_to_time(time.time() - start_spider)
+
+    print(running_time_getter)
+    print(running_time_spider)

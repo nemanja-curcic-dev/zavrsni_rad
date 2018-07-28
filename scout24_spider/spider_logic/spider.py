@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- encoding: utf8 -*-
 
-import aiohttp
 import copy
 import json
 import os
@@ -14,7 +13,7 @@ import uuid
 
 
 from bs4 import BeautifulSoup
-from conf import dictionary, apartment_categories, house_categories, headers, office_commerce_categories, parking_categories
+from .conf import dictionary, apartment_categories, house_categories, headers, office_commerce_categories, parking_categories
 from datetime import datetime
 
 REL_PATH = '/../../properties/'
@@ -34,16 +33,6 @@ class Spider:
 
         self.NUMBER_OF_ADS = 150
         self.immocosmos = 'https://www.immocosmos.ch/'
-
-    async def _fetch(self, session, url, head):
-        """Asynchronously returns response text"""
-        async with session.get(url, headers=head) as response:
-            return await response.content
-
-    async def _session(self, loop, url, head):
-        """Asynchronously returns beautiful soup object"""
-        async with aiohttp.ClientSession(loop=loop) as session:
-            return await self._fetch(session, url, head)
 
     def grab_data(self):
         for i, url in enumerate(self.links_for_scraping):
@@ -78,7 +67,6 @@ class Spider:
 
                 json_string = match
                 keys = json.loads("[" + json_string[0] + "]")
-                print(keys)
 
                 for o in keys:
                     if "price" in o:
@@ -168,13 +156,9 @@ class Spider:
                 images = soup.findAll("img", {"class": "swiper-lazy sc-jzgbtB eBSYZI"})[:8]
 
                 gallery_temp = []
-                print('Gallery')
 
                 for img in images:
                     gallery_temp.append(img['data-src'])
-
-                print(gallery_temp)
-                print(self._se)
 
                 if not os.path.isdir(os.path.dirname(os.path.realpath(__file__))
                                      + REL_PATH + row["slug"]):
@@ -427,5 +411,5 @@ if __name__ == '__main__':
                      'http://www.immoscout24.ch/5078268',
                      'http://www.immoscout24.ch/5010621',
                      'http://www.immoscout24.ch/5010190',
-                     'http://www.immoscout24.ch/4939536'])
+                     'http://www.immoscout24.ch/4939536'],)
     spider.grab_data()
