@@ -1,50 +1,51 @@
 #!/usr/bin/env python
 # -*- encoding: utf8 -*-
-import sys, os
 
-import requests
-import subprocess
-from bs4 import BeautifulSoup
-import re
-import json
-import uuid
-from .conf import headers as bh
-import time
-from datetime import datetime
-import rethinkdb as rdb
+import aiohttp
 import copy
-from .conf import dictionary, apartment_categories, house_categories, office_commerce_categories, parking_categories
-import random
+import json
+import os
+import re
+import rethinkdb
+import requests
+import shutil
+import time
+import uuid
+
+
+from bs4 import BeautifulSoup
+from conf import dictionary, apartment_categories, house_categories, headers, office_commerce_categories, parking_categories
+from datetime import datetime
 
 REL_PATH = '/../../properties/'
-#REL_PATH = '/../../../spiders/spiders/immo-data/properties/'
 
 
 class Spider:
 
     def __init__(self, db, db_host, db_port, links_for_scraping):
-
         self.db = db
         self.db_host = db_host
         self.db_port = db_port
 
-        self.skip_photos = False
         self.links_for_scraping = links_for_scraping
 
-        self.conn = rdb.connect(db=db, host=db_host, port=db_port, user="admin",
+        self.conn = rethinkdb.connect(db=db, host=db_host, port=db_port, user="admin",
                                 password="4f752a0aac5a1a2ed0a6627854d174facb99dc36cd756776b609e9cb8dcce275")
 
-        self.not_found = []
-        self.rows_inserted = 0
-
         self.NUMBER_OF_ADS = 150
-        self.orig_slug = []
         self.immocosmos = 'https://www.immocosmos.ch/'
 
+    async def _fetch(self, session, url, head):
+        """Asynchronously returns response text"""
+        async with session.get(url, headers=head) as response:
+            return await response.content
+
+    async def _session(self, loop, url, head):
+        """Asynchronously returns beautiful soup object"""
+        async with aiohttp.ClientSession(loop=loop) as session:
+            return await self._fetch(session, url, head)
+
     def grab_data(self):
-
-        startTime = datetime.now()
-
         for i, url in enumerate(self.links_for_scraping):
 
             if i >= self.NUMBER_OF_ADS:
@@ -54,18 +55,16 @@ class Spider:
             row['origSource'] = url.strip()
             row["timeStampLinkGrabed"] = int(datetime.now().strftime("%s"))
 
-            dont_skip_images = False
-
-            data = requests.get(row["origSource"])
+            data = requests.get(row["origSource"], headers=headers)
             print('Current url being done: ' + row['origSource'])
 
             soup = BeautifulSoup(data.text, 'html.parser')
 
-            if not self.set_category(row, soup):
+            if not self._set_category(row, soup):
                 print('Category not found')
                 continue
 
-            self.set_action(row, soup)
+            self._set_action(row, soup)
 
             row["slug"] = str(uuid.uuid4())[:8]
 
@@ -73,10 +72,13 @@ class Spider:
 
             matches = re.findall(txt, data.text)
 
+            dont_skip_images = False
+
             for match in matches:
 
                 json_string = match
                 keys = json.loads("[" + json_string[0] + "]")
+                print(keys)
 
                 for o in keys:
                     if "price" in o:
@@ -88,7 +90,7 @@ class Spider:
                         else:
                             if row["isRent"]:
                                 row["price"]["rentPrice"] = int(o["price"])
-                                row["price"] = self.update_price(row, soup)
+                                self._update_price(row, soup)
                             else:
                                 row["price"]["salePrice"] = int(o["price"])
 
@@ -108,7 +110,8 @@ class Spider:
                         row["mainFeatures"]["livingSpace"] = int(o["livingSpace"])
 
                     if "floorLevel" in o:
-                        row["mainFeatures"]["floor"] = int(o["floorLevel"])
+                        if int(o["floorLevel"]) > 0:
+                            row["mainFeatures"]["floor"] = int(o["floorLevel"])
 
                     if "numberOfRooms" in o:
                         row["mainFeatures"]["rooms"] = float(o["numberOfRooms"])
@@ -117,8 +120,8 @@ class Spider:
                         if o["countImages"] != "0":
                             dont_skip_images = True
 
-            row["lat"], row["lon"] = self.update_geo(row, soup)
-            self.set_location(row)
+            row["lat"], row["lon"] = self._update_geo(row, soup)
+            self._set_location(row)
 
             txt = r'kvyearbuilt:\'(.*)\''
 
@@ -131,12 +134,13 @@ class Spider:
                 except ValueError:
                     pass
 
-            row["additionalFeatures"] = self.features(soup, row)
-            row["mainFeatures"] = self.main_features(soup, row)
+            self._features(soup, row)
+            self._main_features(soup, row)
 
-            row["details"] = self.details(soup, row)
-            row["distances"] = self.distances(soup, row)
-            self.set_technics(soup, row)
+            self._details(soup, row)
+            self._distances(soup, row)
+            self._set_technics(soup, row)
+            self._download_images(soup, row, dont_skip_images)
 
             try:
                 row["name"] = soup.findAll("h1")[0].text
@@ -147,80 +151,51 @@ class Spider:
 
             row["timeStampAdded"] = int(time.time())
 
-            result = rdb.table("property").insert(row).run(self.conn)
-            self.rows_inserted += 1
+            result = rethinkdb.table("property").insert(row).run(self.conn)
 
             row["id"] = result["generated_keys"][0]
             print(row["id"])
 
-            self.w("Created: "+row["id"])
-            self.w("Created slug: " + row["slug"] + "\n")
-
-            if not self.skip_photos:
-                print('Skip photos')
-
-                if dont_skip_images:
-                    print('skip images')
-                    if soup.find("div", {"class": "swiper-wrapper sc-dliRfk fbLxZz"}) is not None\
-                            or soup.find("div", {"class": "swiper-container  swiper-uid-media-gallery sc-VJcYb hKZfbA"}) is not None\
-                            or soup.find("div", {"class": "swiper-wrapper sc-iBEsjs fffXLE"}) is not None:
-                        images = soup.findAll("img", {"class": "swiper-lazy sc-dTdPqK jZzoP"})
-
-                        print(images)
-
-                        gallery_temp = []
-                        print('Gallery')
-
-                        for img in images:
-                            gallery_temp.append(img['data-src'])
-
-                        print(gallery_temp)
-
-                        if not os.path.isdir(os.path.dirname(os.path.realpath(__file__))
-                                                     + REL_PATH + row["slug"]):
-                            os.mkdir(os.path.dirname(os.path.realpath(__file__)) + REL_PATH + row["slug"])
-
-                        self.w("downloading images\n")
-
-                        for img_link in gallery_temp:
-
-                            img_name = str(uuid.uuid4())[:8]
-
-                            row["media"]["gallery"].append(img_name + ".jpg")
-
-                            p = subprocess.Popen(
-                                "curl -s '" + img_link + "' --header '" + bh["User-Agent"] + "' > " + os.path.dirname(
-                                    os.path.realpath(__file__)) + REL_PATH + row[
-                                    "slug"] + "/" + img_name + ".jpg",
-                                shell=True, stdout=subprocess.PIPE)
-                            p.communicate()[0]
-
-                        row["media"]["lead"] = row["media"]["gallery"][0]
-
-            self.w("update in progress for " + row["id"])
-
-            rdb.table("property").get(row["id"]).update(row).run(self.conn)
-
-            self.w("update done for " + row["id"])
             print(row)
 
             print(50 * "*")
 
-            self.orig_slug.append((row['origSource'], self.immocosmos + row['slug']))
+    def _download_images(self, soup, row, skip):
+        if skip:
+            if soup.find("div", {"class": "swiper-wrapper sc-eMigcr eRrGUR"}) is not None \
+                    or soup.find("div", {"class": "swiper-container  swiper-uid-media-gallery sc-VJcYb hKZfbA"}) is not None \
+                    or soup.find("div", {"class": "swiper-wrapper sc-iBEsjs fffXLE"}) is not None:
+                images = soup.findAll("img", {"class": "swiper-lazy sc-jzgbtB eBSYZI"})[:8]
 
-        self.w('\033[92m' + "Exec time: " + str(datetime.now() - startTime) + '\033[0m')
+                gallery_temp = []
+                print('Gallery')
 
-    def create_random_sample(self):
-        random_sample = random.sample(range(1, len(self.orig_slug)), 3)
-        sample = []
+                for img in images:
+                    gallery_temp.append(img['data-src'])
 
-        for i, t in enumerate(self.orig_slug):
-            if i in random_sample:
-                sample.append(t)
+                print(gallery_temp)
+                print(self._se)
 
-        return sample
+                if not os.path.isdir(os.path.dirname(os.path.realpath(__file__))
+                                     + REL_PATH + row["slug"]):
+                    os.mkdir(os.path.dirname(os.path.realpath(__file__)) + REL_PATH + row["slug"])
 
-    def set_action(self, row, bs):
+                for img_url in gallery_temp:
+                    img_name = str(uuid.uuid4())[:8]
+
+                    row["media"]["gallery"].append(img_name + ".jpg")
+
+                    resp = requests.get(img_url, stream=True)
+
+                    if resp.status_code == 200:
+                        with open(os.path.dirname(os.path.realpath(__file__))
+                                  + REL_PATH + row['slug'] + '/' + img_name + ".jpg", 'wb') as f:
+                            resp.raw.decode_content = True
+                            shutil.copyfileobj(resp.raw, f)
+
+                row["media"]["lead"] = row["media"]["gallery"][0]
+
+    def _set_action(self, row, bs):
         res = re.search(r'"localVirtualPagePath":"/\w+/\w+/([\w-]+)/', bs.text)
         text = res.group(1)
 
@@ -231,7 +206,7 @@ class Spider:
             row['isRent'] = False
             row['isSale'] = True
 
-    def set_category(self, row, bs):
+    def _set_category(self, row, bs):
         try:
             res = re.search(r'"localVirtualPagePath":"/\w+/\w+/([\w-]+)/', bs.text)
             text = res.group(1)
@@ -258,11 +233,9 @@ class Spider:
         except (Exception, AttributeError):
             return False
 
-        self.not_found.append(text)
         return False
 
-    @staticmethod
-    def update_price(row, soup):
+    def _update_price(self, row, soup):
 
         tables = soup.findAll('table', {'class': 'sc-kXeGPI hnzUah'})
         print('Update price in progress...')
@@ -291,13 +264,9 @@ class Spider:
             if price_div:
                 row['price']['rentPrice'] = int("".join(re.findall(r'\d', price_div.text)))
 
-        return row['price']
-
-
-    @staticmethod
-    def update_geo(row, soup):
+    def _update_geo(self, row, soup):
         print('Updating geo location...')
-        f = soup.findAll("a", {"class": "sc-fOICqy eiIwtf"})
+        f = soup.findAll("a", {"class": "sc-gmeYpB gkZGuT"})
 
         lat = 0
         lon = 0
@@ -305,27 +274,18 @@ class Spider:
         for e in f:
 
             if e.text == "Open in Google Maps" or e.text == "In Google Maps öffnen":
+                lat_lng = re.search(r'q=([\d,.]+)', e['href']).group(1).split(',')
+                lat = lat_lng[0].strip()
+                lon = lat_lng[1].strip()
 
-                regex = r"(?<=\=)([\-]?[\d]*\.[\d]*),([\-]?[\d]*\.[\d]*)"
-
-                matches = re.finditer(regex, e["href"])
-
-                for matchNum, match in enumerate(matches):
-                    for groupNum in range(0, len(match.groups())):
-                        groupNum += 1
-                        if groupNum == 1:
-                            lat = match.group(groupNum)
-                        if groupNum == 2:
-                            lon = match.group(groupNum)
         return float(lat), float(lon)
 
-    def set_location(self, row):
-        row['location'] = rdb.point(row['lon'], row['lat'])
+    def _set_location(self, row):
+        row['location'] = rethinkdb.point(row['lon'], row['lat'])
 
-    @staticmethod
-    def main_features(soup, row):
+    def _main_features(self, soup, row):
         print('Updating main features...')
-        tables = soup.findAll("table", {"class": "sc-kXeGPI hnzUah"})
+        tables = soup.findAll("table", {"class": "sc-dRaagA bhXcKa"})
 
         for table in tables:
 
@@ -338,13 +298,10 @@ class Spider:
                 if td.text == "Garage":
                     row["mainFeatures"]["garages"] = 1
 
-        return row["mainFeatures"]
-
-    @staticmethod
-    def set_technics(soup, row):
+    def _set_technics(self, soup, row):
         print('Updating technics...')
 
-        tables = soup.findAll("table", {"class": "sc-kXeGPI hnzUah"})
+        tables = soup.findAll("table", {"class": "sc-dRaagA bhXcKa"})
 
         for table in tables:
             tds = table.findAll("td")
@@ -357,10 +314,9 @@ class Spider:
                 elif td.text == 'Washing machine':
                     row['additionalFeatures']['equipment']['washingMachine'] = True
 
-    @staticmethod
-    def features(soup, row):
+    def _features(self, soup, row):
         print('Updating features...')
-        tables = soup.findAll("table", {"class": "sc-kXeGPI hnzUah"})
+        tables = soup.findAll("table", {"class": "sc-dRaagA bhXcKa"})
 
         for table in tables:
 
@@ -415,12 +371,9 @@ class Spider:
                 if td.text == "View":
                     row["additionalFeatures"]["interior"]["view"] = True
 
-        return row["additionalFeatures"]
-
-    @staticmethod
-    def distances(distances, row):
+    def _distances(self, distances, row):
         print('Updating distances...')
-        tables = distances.findAll("table", {"class": "sc-kXeGPI hnzUah"})
+        tables = distances.findAll("table", {"class": "sc-dRaagA bhXcKa"})
 
         for table in tables:
 
@@ -451,30 +404,28 @@ class Spider:
                     bus = re.findall(r'\d+', td.findNext('td').text)
                     row["distances"]["highway"] = int(bus[0])
 
-        return row["distances"]
-
-    @staticmethod
-    def details(soup, row):
+    def _details(self, soup, row):
         print('Setting description...')
         try:
-            articles = soup.findAll("article", {"class": "sc-kQsIoO dgcxoN"})
+            articles = soup.findAll("article", {"class": "sc-iiUIRa bFCCmo"})
 
             for article in articles:
                 if article.find('h2') is not None:
                     if article.find('h2').text.find('Description') != -1:
-                        row['details']['description'] = str(article.find('div', {'class': 'sc-cHSUfg IGUaS'}))
+                        row['details']['description'] = str(article.find('div', {'class': 'sc-gbzWSY bLlKAv'}))
 
         except Exception as e:
             print("error setting description " + repr(e))
 
-        return row["details"]
-
-    def w(self, m):
-        sys.stdout.write(m)
 
 if __name__ == '__main__':
     spider = Spider('zavrsni_rad',
                     '127.0.0.1',
                     28015,
-                    ['https://www.immoscout24.ch/en/d/detached-house-rent-erlinsbach/2845302?s=3&t=1&l=28&ct=11&ci=4&pn=1'])
+                    ['http://www.immoscout24.ch/5093464',
+                     'http://www.immoscout24.ch/5088057',
+                     'http://www.immoscout24.ch/5078268',
+                     'http://www.immoscout24.ch/5010621',
+                     'http://www.immoscout24.ch/5010190',
+                     'http://www.immoscout24.ch/4939536'])
     spider.grab_data()

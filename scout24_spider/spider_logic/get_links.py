@@ -1,7 +1,6 @@
 import aiohttp
 import bs4
 from .conf import actions, categories
-from .helpers import convert_seconds_to_time
 import asyncio
 import time
 import sys
@@ -20,6 +19,7 @@ class Scout24GetLinks:
         self.db_ip = db_ip
         self.db_port = db_port
         self.conn = None
+
         self.search_links = []
         self.ad_page_urls = []
         self.concurrent = concurrent
@@ -57,8 +57,7 @@ class Scout24GetLinks:
                                              + action + '/'
                                              + region.strip())
 
-        for link in self.search_links:
-            print(link)
+        print(self.search_links)
 
     def create_links_to_pages(self):
         self._create_search_links()
@@ -91,13 +90,11 @@ class Scout24GetLinks:
                 time.sleep(self.sleep_time)
 
     def _parse_links_from_ad_pages(self, bs, url):
-        div = bs.find('div', {'class': 'sc-erNlkL frNfAJ'})
+        div = bs.find('div', {'class': 'sc-eIHaNI iqqmmo'})
 
         if div is not None:
-            h1 = div.find('h1', {'class': 'sc-cpmKsF hHCBUV'})
+            h1 = div.find('h1', {'class': 'sc-VJcYb dWBnJT'})
             amount = re.search(r'\d+', h1.text).group(0)
-            if int(amount) == 1000:
-                print(url, amount)
 
             if amount is not None:
                 pages = int(amount) // 24 + 1
@@ -132,26 +129,25 @@ class Scout24GetLinks:
 
     def _parse_relative_urls(self, search_results):
         for bs in search_results:
-            h3_tags = bs.findAll('h3', {'class': 'sc-kkbgRg iGfZRt'})
-            print('h3 tags: ', h3_tags)
+            h3_tags = bs.findAll('h3', {'class': 'sc-fihHvN fvfhdN'})
 
             try:
                 for h3 in h3_tags:
                     if h3 is not None:
-                        a = h3.find('a', {'class': 'sc-fOICqy iDHGrp'})
+                        a = h3.find('a', {'class': 'sc-gmeYpB ePRbGj'})
                         href = a['href']
-                        print(href)
                         slug = re.search(r'/(\d{6,8})\?', href)
 
                         if slug is not None:
                             object_url = self.CONCAT_URL + slug.group(1)
+                            print(object_url)
 
                             if object_url.strip() not in self.links_to_objects_dict:
                                 object_url = object_url.strip()
                                 self.links_to_objects_dict[object_url] = object_url
                                 self.links_to_objects_list.append(object_url)
             except AttributeError as e:
-                print(a)
+                print(e)
 
     def set_links_for_scraping(self):
         self.conn = rethinkdb.connect(db=self.db,
@@ -160,14 +156,11 @@ class Scout24GetLinks:
                                       user="admin",
                                       password="4f752a0aac5a1a2ed0a6627854d174facb99dc36cd756776b609e9cb8dcce275")
 
-        count = rethinkdb.table("property").get_all("scout24", index="spiderName").count().run(self.conn)
-        print('Count from db: {}'.format(count))
-
         print("Fetching urls from database...", file=sys.stderr)
         rows = list(rethinkdb.table("property")
-                    .get_all("scout24", index="spiderName")
-                    .slice(0, count).pluck("origSource").run(self.conn))
+                    .get_all("scout24", index="spiderName").pluck("origSource").run(self.conn))
 
+        # add urls to dictionary
         for row in rows:
             db_url = row['origSource'].strip()
             if db_url not in self.db_urls:
@@ -177,26 +170,6 @@ class Scout24GetLinks:
             link = link.strip()
             if link not in self.db_urls:
                 self.links_to_be_scraped.append(link)
-
-
-if __name__ == '__main__':
-    start = time.time()
-    
-    loop = asyncio.get_event_loop()
-    spider = Scout24GetLinks(loop=loop,
-                             db='immoreal',
-                             db_ip='139.59.158.52',
-                             db_port=28015,
-                             concurrent=10,
-                             pause=0.3)
-    
-    spider.create_links_to_pages()
-
-    spider.get_ad_pages()
-    spider.set_links_for_scraping()
-    
-    print('New links for scraping found: {}'.format(len(spider.links_to_be_scraped)))
-    print('Running time was {}'.format(convert_seconds_to_time(time.time() - start)))
 
 
 
